@@ -1,0 +1,180 @@
+#include "bsp_timer.h"
+#include "bsp.h"
+	
+__IO int32_t g_iRunTime = 0;
+static volatile uint32_t s_uiDelayCount = 0;
+static volatile uint8_t s_ucTimeOutFlag = 0;
+
+/* 定于软件定时器结构体变量 */
+static SOFT_TMR s_tTmr[TMR_COUNT];
+/* 保存 TIM定时中断到后执行的回调函数指针 */
+static void (*s_TIM_CallBack1)(void);
+static void (*s_TIM_CallBack2)(void);
+static void (*s_TIM_CallBack3)(void);
+static void (*s_TIM_CallBack4)(void);
+
+
+void bsp_systick_init(void)
+{
+	SysTick_Config(SystemCoreClock / 1000);
+}
+void SysTick_ISR(void)
+{
+    static uint16_t s_count = 0;
+    uint8_t i;
+
+    /* 每隔1ms进来1次 （仅用于 bsp_DelayMS） */
+    if (s_uiDelayCount > 0)
+    {
+        if (--s_uiDelayCount == 0)
+        {
+            s_ucTimeOutFlag = 1;
+        }
+    }
+
+    /* 每隔1ms，对软件定时器的计数器进行减一操作 */
+//    for (i = 0; i < TMR_COUNT; i++)
+//    {
+//        bsp_SoftTimerDec(&s_tTmr[i]);
+//    }
+
+    /* 全局运行时间每1ms增1 */
+    g_iRunTime++;
+    
+    if (g_iRunTime == 0x7FFFFFFF)	/* 这个变量是 int32_t 类型，最大数为 0x7FFFFFFF */
+    {
+        g_iRunTime = 0;
+    }
+
+//    bsp_RunPer1ms();		/* 每隔1ms调用一次此函数，此函数在 bsp.c */
+
+//    if (s_count % 10==0)
+//    {
+//        bsp_RunPer10ms();	/* 每隔10ms调用一次此函数，此函数在 bsp.c */
+//    }
+//    if(s_count %1000==0){
+//        bsp_RunPer1s();
+//        s_count=1;
+//    }
+}
+void SysTick_Handler(void)
+{
+	SysTick_ISR();
+	
+}
+
+void bsp_DelayUS(uint32_t n)
+{
+	uint32_t ticks;
+    uint32_t told;
+    uint32_t tnow;
+    uint32_t tcnt = 0;
+    uint32_t reload;
+	
+	reload = SysTick->LOAD;
+    ticks = n * (SystemCoreClock / 1000000);	 /* 需要的节拍数 */
+	tcnt = 0;
+    told = SysTick->VAL;             /* 刚进入时的计数器值 */
+	while (1)
+    {
+        tnow = SysTick->VAL;
+        if (tnow != told)
+        {
+            /* SYSTICK是一个递减的计数器 */
+            if (tnow < told)
+            {
+                tcnt += told - tnow;
+            }
+            /* 重新装载递减 */
+            else
+            {
+                tcnt += reload - tnow + told;
+            }
+            told = tnow;
+            /* 时间超过/等于要延迟的时间,则退出 */
+            if (tcnt >= ticks)
+            {
+                break;
+            }
+        }
+    }
+}
+void bsp_DelayMS(uint32_t n)
+{
+	if (n == 0)
+    {
+        return;
+    }
+    else if (n == 1)
+    {
+        n = 2;
+    }
+	
+	DISABLE_INT();  			/* 关中断 */
+
+    s_uiDelayCount = n;
+    s_ucTimeOutFlag = 0;
+
+    ENABLE_INT();  				/* 开中断 */
+
+    while (1)
+    {
+//        bsp_Idle();				/* CPU空闲执行的操作， 见 bsp.c 和 bsp.h 文件 */
+        /*
+        	等待延迟时间到
+        	注意：编译器认为 s_ucTimeOutFlag = 0，所以可能优化错误，因此 s_ucTimeOutFlag 变量必须申明为 volatile
+        */
+        if (s_ucTimeOutFlag == 1)
+        {
+            break;
+        }
+    }
+	
+}
+
+
+void bsp_timer_init(void)
+{
+	uint8_t i;
+	TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;	/* 中断结构体在 misc.h 中定义 */
+    uint32_t usPeriod;
+    uint16_t usPrescaler;
+    uint32_t uiTIMxCLK;
+    /* 清零所有的软件定时器 */
+    for (i = 0; i < TMR_COUNT; i++)
+    {
+        s_tTmr[i].Count = 0;
+        s_tTmr[i].PreLoad = 0;
+        s_tTmr[i].Flag = 0;
+        s_tTmr[i].Mode = TMR_ONCE_MODE;	/* 缺省是1次性工作模式 */
+    }
+	
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
+	uiTIMxCLK = SystemCoreClock / 2;
+    usPrescaler = uiTIMxCLK / 1000000 ;	/* 分频到周期 1us */
+	usPeriod = 0xFFFF;
+	
+	TIM_TimeBaseStructure.TIM_Period = usPeriod;
+    TIM_TimeBaseStructure.TIM_Prescaler = usPrescaler;
+    TIM_TimeBaseStructure.TIM_ClockDivision = 0;
+    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+
+    TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
+
+    //TIM_ARRPreloadConfig(TIMx, ENABLE);
+
+    /* TIMx enable counter */
+    TIM_Cmd(TIM3, ENABLE);
+
+	
+
+        NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
+
+        NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 4;	/* 比串口优先级低 */
+        NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+        NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+        NVIC_Init(&NVIC_InitStructure);
+}
+	
+

@@ -1,0 +1,360 @@
+#include "bsp_usartx.h"
+#include<stdio.h>
+
+
+
+
+void InitHardUart(void)
+{
+	GPIO_InitTypeDef GPIO_InitStructure;
+    USART_InitTypeDef USART_InitStructure;
+	#if UART1_FIFO_EN == 1		/* 串口1 TX = PA9   RX = PA10 或 TX = PB6   RX = PB7*/
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
+
+    /* 第2步：将USART Tx的GPIO配置为推挽复用模式 */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    /* 第3步：将USART Rx的GPIO配置为浮空输入模式
+    	由于CPU复位后，GPIO缺省都是浮空输入模式，因此下面这个步骤不是必须的
+    	但是，我还是建议加上便于阅读，并且防止其它地方修改了这个口线的设置参数
+    */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    /* 第4步： 配置串口硬件参数 */
+    USART_InitStructure.USART_BaudRate = UART1_BAUD;	/* 波特率 */
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No ;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    USART_Init(USART1, &USART_InitStructure);
+
+    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);	/* 使能接收中断 */
+    /*
+    	USART_ITConfig(USART1, USART_IT_TXE, ENABLE);
+    	注意: 不要在此处打开发送中断
+    	发送中断使能在SendUart()函数打开
+    */
+    USART_Cmd(USART1, ENABLE);		/* 使能串口 */
+
+    /* CPU的小缺陷：串口配置好，如果直接Send，则第1个字节发送不出去
+    	如下语句解决第1个字节无法正确发送出去的问题 */
+    USART_ClearFlag(USART1, USART_FLAG_TC);     /* 清发送完成标志，Transmission Complete flag */
+	#endif
+	
+	#if UART2_FIFO_EN == 1		/* 串口2 TX = PA2， RX = PA3  */
+    /* 第1步：打开GPIO和USART部件的时钟 */
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
+
+    /* 第2步：将USART Tx的GPIO配置为推挽复用模式 */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    /* 第3步：将USART Rx的GPIO配置为浮空输入模式
+    	由于CPU复位后，GPIO缺省都是浮空输入模式，因此下面这个步骤不是必须的
+    	但是，我还是建议加上便于阅读，并且防止其它地方修改了这个口线的设置参数
+    */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    /*  第3步已经做了，因此这步可以不做
+    	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    */
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    /* 第4步： 配置串口硬件参数 */
+    USART_InitStructure.USART_BaudRate = UART2_BAUD;	/* 波特率 */
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No ;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Tx | USART_Mode_Rx;		/* 仅选择接收模式 */
+    USART_Init(USART2, &USART_InitStructure);
+
+    USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);	/* 使能接收中断 */
+    /*
+    	USART_ITConfig(USART1, USART_IT_TXE, ENABLE);
+    	注意: 不要在此处打开发送中断
+    	发送中断使能在SendUart()函数打开
+    */
+    USART_Cmd(USART2, ENABLE);		/* 使能串口 */
+
+    /* CPU的小缺陷：串口配置好，如果直接Send，则第1个字节发送不出去
+    	如下语句解决第1个字节无法正确发送出去的问题 */
+    USART_ClearFlag(USART2, USART_FLAG_TC);     /* 清发送完成标志，Transmission Complete flag */
+#endif
+
+#if UART3_FIFO_EN == 1			/* 串口3 TX = PB10   RX = PB11 */
+
+
+    /* 第1步： 开启GPIO和UART时钟 */
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB | RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
+
+    /* 第2步：将USART Tx的GPIO配置为推挽复用模式 */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+    /* 第3步：将USART Rx的GPIO配置为浮空输入模式
+    	由于CPU复位后，GPIO缺省都是浮空输入模式，因此下面这个步骤不是必须的
+    	但是，我还是建议加上便于阅读，并且防止其它地方修改了这个口线的设置参数
+    */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+    /*  第3步已经做了，因此这步可以不做
+    	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    */
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+    /* 第4步： 配置串口硬件参数 */
+    USART_InitStructure.USART_BaudRate = UART3_BAUD;	/* 波特率 */
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No ;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    USART_Init(USART3, &USART_InitStructure);
+
+    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);	/* 使能接收中断 */
+    /*
+    	USART_ITConfig(USART1, USART_IT_TXE, ENABLE);
+    	注意: 不要在此处打开发送中断
+    	发送中断使能在SendUart()函数打开
+    */
+    USART_Cmd(USART3, ENABLE);		/* 使能串口 */
+
+    /* CPU的小缺陷：串口配置好，如果直接Send，则第1个字节发送不出去
+    	如下语句解决第1个字节无法正确发送出去的问题 */
+    USART_ClearFlag(USART3, USART_FLAG_TC);     /* 清发送完成标志，Transmission Complete flag */
+#endif
+
+#if UART4_FIFO_EN == 1			/* 串口4 TX = PC10   RX = PC11 */
+    /* 第1步： 开启GPIO和UART时钟 */
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC | RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART4, ENABLE);
+
+    /* 第2步：将USART Tx的GPIO配置为推挽复用模式 */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+    /* 第3步：将USART Rx的GPIO配置为浮空输入模式
+    	由于CPU复位后，GPIO缺省都是浮空输入模式，因此下面这个步骤不是必须的
+    	但是，我还是建议加上便于阅读，并且防止其它地方修改了这个口线的设置参数
+    */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+    /* 第4步： 配置串口硬件参数 */
+    USART_InitStructure.USART_BaudRate = UART4_BAUD;	/* 波特率 */
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No ;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    USART_Init(UART4, &USART_InitStructure);
+
+    USART_ITConfig(UART4, USART_IT_RXNE, ENABLE);	/* 使能接收中断 */
+    /*
+    	USART_ITConfig(USART1, USART_IT_TXE, ENABLE);
+    	注意: 不要在此处打开发送中断
+    	发送中断使能在SendUart()函数打开
+    */
+    USART_Cmd(UART4, ENABLE);		/* 使能串口 */
+
+    /* CPU的小缺陷：串口配置好，如果直接Send，则第1个字节发送不出去
+    	如下语句解决第1个字节无法正确发送出去的问题 */
+    USART_ClearFlag(UART4, USART_FLAG_TC);     /* 清发送完成标志，Transmission Complete flag */
+#endif
+
+#if UART5_FIFO_EN == 1			/* 串口5 TX = PC12   RX = PD2 */
+    /* 第1步： 开启GPIO和UART时钟 */
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD | RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART5, ENABLE);
+
+    /* 第2步：将USART Tx的GPIO配置为推挽复用模式 */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+    /* 第3步：将USART Rx的GPIO配置为浮空输入模式
+    	由于CPU复位后，GPIO缺省都是浮空输入模式，因此下面这个步骤不是必须的
+    	但是，我还是建议加上便于阅读，并且防止其它地方修改了这个口线的设置参数
+    */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_10MHz;
+    GPIO_Init(GPIOD, &GPIO_InitStructure);
+
+
+    /* 第4步： 配置串口硬件参数 */
+    USART_InitStructure.USART_BaudRate = UART5_BAUD;	/* 波特率 */
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No ;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    USART_Init(UART5, &USART_InitStructure);
+
+    USART_ITConfig(UART5, USART_IT_RXNE, ENABLE);	/* 使能接收中断 */
+    /*
+    	USART_ITConfig(USART1, USART_IT_TXE, ENABLE);
+    	注意: 不要在此处打开发送中断
+    	发送中断使能在SendUart()函数打开
+    */
+    USART_Cmd(UART5, ENABLE);		/* 使能串口 */
+
+    /* CPU的小缺陷：串口配置好，如果直接Send，则第1个字节发送不出去
+    	如下语句解决第1个字节无法正确发送出去的问题 */
+    USART_ClearFlag(UART5, USART_FLAG_TC);     /* 清发送完成标志，Transmission Complete flag */
+#endif
+	
+}
+
+void ConfigUartNVIC(void)
+{
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+    /* Configure the NVIC Preemption Priority Bits */
+    /*	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_0);  --- 在 bsp.c 中 bsp_Init() 中配置中断优先级组 */
+
+#if UART1_FIFO_EN == 1
+    /* 使能串口1中断 */
+    NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+#endif
+
+#if UART2_FIFO_EN == 1
+    /* 使能串口2中断 */
+    NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+#endif
+
+#if UART3_FIFO_EN == 1
+    /* 使能串口3中断t */
+    NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+#endif
+
+#if UART4_FIFO_EN == 1
+    /* 使能串口4中断t */
+    NVIC_InitStructure.NVIC_IRQChannel = UART4_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+#endif
+
+#if UART5_FIFO_EN == 1
+    /* 使能串口5中断t */
+    NVIC_InitStructure.NVIC_IRQChannel = UART5_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+#endif
+
+#if UART6_FIFO_EN == 1
+    /* 使能串口6中断t */
+    NVIC_InitStructure.NVIC_IRQChannel = USART6_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 5;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+#endif
+}
+
+void bsp_usart_init(void)
+{
+	InitHardUart();
+	ConfigUartNVIC();
+}
+
+int fputc(int ch, FILE *f)
+{
+#if 0	/* 将需要printf的字符通过串口中断FIFO发送出去，printf函数会立即返回 */
+    comSendChar(COM1, ch);
+
+    return ch;
+#else	/* 采用阻塞方式发送每个字符,等待数据发送完毕 */
+    /* 写一个字节到USART1 */
+    USART_SendData(USART1, (uint8_t) ch);
+
+    /* 等待发送结束 */
+    while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET)
+    {}
+
+    return ch;
+#endif
+}
+int fgetc(FILE *f)
+{
+
+#if 0	/* 从串口接收FIFO中取1个数据, 只有取到数据才返回 */
+    uint8_t ucData;
+
+    while(comGetChar(COM1, &ucData) == 0);
+
+    return ucData;
+#else
+    /* 等待串口1输入数据 */
+    while (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == RESET);
+
+    return (int)USART_ReceiveData(USART1);
+#endif
+}
+
+#if UART1_FIFO_EN==1
+void USART1_IRQHandler(void)
+{
+
+	
+}
+#endif
+#if UART2_FIFO_EN==1
+void USART2_IRQHandler(void)
+{
+
+}
+#endif
+#if UART3_FIFO_EN==1
+void USART3_IRQHandler(void)
+{
+
+}
+#endif
+#if UART4_FIFO_EN==1
+void UART4_IRQHandler(void)
+{
+if(USART_GetITStatus(UART4,USART_IT_IDLE)!=RESET)
+	{
+		
+		
+	}
+}
+#endif
+#if UART5_FIFO_EN==1
+void UART5_IRQHandler(void)
+{
+
+}
+#endif
+
