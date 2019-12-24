@@ -61,7 +61,12 @@ typedef struct
 #define REG_TXX		REG_T03
 
 
+#define SLAVE_REG_P01		0x0301
+#define SLAVE_REG_P02		0x0302
 
+/* 04H 读取输入寄存器(模拟信号) */
+#define REG_A01		0x0401
+#define REG_AXX		REG_A01
 
 
 #endif

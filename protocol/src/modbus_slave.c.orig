@@ -118,7 +118,7 @@ static void MODS_SendAckOk(void)
 static uint8_t MODS_ReadRegValue(uint16_t reg_addr, uint8_t *reg_value)
 {
     uint16_t value;
-    value = g_tVarS.DR[reg_addr];
+        value = g_tVarS.DR[reg_addr];
     reg_value[0] = value >> 8;
     reg_value[1] = value;
 
@@ -136,7 +136,7 @@ static uint8_t MODS_ReadRegValue(uint16_t reg_addr, uint8_t *reg_value)
 */
 static uint8_t MODS_WriteRegValue(uint16_t reg_addr, uint16_t reg_value)
 {
-
+    
     g_tVarS.DR[reg_addr] = reg_value;
 //    STMFLASH_Write(MODBUS_REG_BASE_ADDR+reg_addr,&reg_value,1);
 
@@ -283,7 +283,7 @@ static void MODS_02H(void)
 */
 static void MODS_03H(void)
 {
-
+	
 }
 /*
 *********************************************************************************************************
@@ -295,66 +295,7 @@ static void MODS_03H(void)
 */
 static void MODS_04H(void)
 {
-	uint16_t reg;
-    uint16_t num;
-    uint16_t i;
-    uint16_t status[10];
 
-    memset(status, 0, 10);
-
-    g_tModS.RspCode = RSP_OK;
-
-    if (g_tModS.RxCount != 8)
-    {
-        g_tModS.RspCode = RSP_ERR_VALUE;	/* 数据值域错误 */
-        goto err_ret;
-    }
-
-    reg = BEBufToUint16(&g_tModS.RxBuf[2]); 	/* 寄存器号 */
-    num = BEBufToUint16(&g_tModS.RxBuf[4]);	/* 寄存器个数 */
-
-    if ((reg >= REG_A01) && (num > 0) && (reg + num <= REG_AXX + 1))
-    {
-        for (i = 0; i < num; i++)
-        {
-            switch (reg)
-            {
-            /* 测试参数 */
-            case REG_A01:
-                status[i] = g_tVarS.A01;
-                break;
-
-            default:
-                status[i] = 0;
-                break;
-            }
-            reg++;
-        }
-    }
-    else
-    {
-        g_tModS.RspCode = RSP_ERR_REG_ADDR;		/* 寄存器地址错误 */
-    }
-
-err_ret:
-    if (g_tModS.RspCode == RSP_OK)		/* 正确应答 */
-    {
-        g_tModS.TxCount = 0;
-        g_tModS.TxBuf[g_tModS.TxCount++] = g_tModS.RxBuf[0];
-        g_tModS.TxBuf[g_tModS.TxCount++] = g_tModS.RxBuf[1];
-        g_tModS.TxBuf[g_tModS.TxCount++] = num * 2;			/* 返回字节数 */
-
-        for (i = 0; i < num; i++)
-        {
-            g_tModS.TxBuf[g_tModS.TxCount++] = status[i] >> 8;
-            g_tModS.TxBuf[g_tModS.TxCount++] = status[i] & 0xFF;
-        }
-        MODS_SendWithCRC(g_tModS.TxBuf, g_tModS.TxCount);
-    }
-    else
-    {
-        MODS_SendAckErr(g_tModS.RspCode);	/* 告诉主机命令错误 */
-    }
 }
 /*
 *********************************************************************************************************
@@ -366,55 +307,7 @@ err_ret:
 */
 static void MODS_05H(void)
 {
-	uint16_t reg;
-    uint16_t value;
 
-    g_tModS.RspCode = RSP_OK;
-
-    if (g_tModS.RxCount != 8)
-    {
-        g_tModS.RspCode = RSP_ERR_VALUE;		/* 数据值域错误 */
-        goto err_ret;
-    }
-
-    reg = BEBufToUint16(&g_tModS.RxBuf[2]); 	/* 寄存器号 */
-    value = BEBufToUint16(&g_tModS.RxBuf[4]);	/* 数据 */
-
-    if (value != 0 && value != 1)
-    {
-        g_tModS.RspCode = RSP_ERR_VALUE;		/* 数据值域错误 */
-        goto err_ret;
-    }
-
-    if (reg == REG_D01)
-    {
-        g_tVarS.D01 = value;
-        
-    }
-    else if (reg == REG_D02)
-    {
-        g_tVarS.D02 = value;
-        
-    }
-    else if (reg == REG_D03)
-    {
-        g_tVarS.D03 = value;
-        
-    }
-
-    else
-    {
-        g_tModS.RspCode = RSP_ERR_REG_ADDR;		/* 寄存器地址错误 */
-    }
-err_ret:
-    if (g_tModS.RspCode == RSP_OK)				/* 正确应答 */
-    {
-        MODS_SendAckOk();
-    }
-    else
-    {
-        MODS_SendAckErr(g_tModS.RspCode);		/* 告诉主机命令错误 */
-    }
 }
 /*
 *********************************************************************************************************
@@ -426,39 +319,7 @@ err_ret:
 */
 static void MODS_06H(void)
 {
-	uint16_t reg;
-    uint16_t value;
 
-    g_tModS.RspCode = RSP_OK;
-
-    if (g_tModS.RxCount != 8)
-    {
-        g_tModS.RspCode = RSP_ERR_VALUE;		/* 数据值域错误 */
-        goto err_ret;
-    }
-
-    reg = BEBufToUint16(&g_tModS.RxBuf[2]); 	/* 寄存器号 */
-    value = BEBufToUint16(&g_tModS.RxBuf[4]);	/* 寄存器值 */
-    if (MODS_WriteRegValue(reg, value) == 1)	/* 该函数会把写入的值存入寄存器 */
-    {
-        
-    } else {
-        g_tModS.RspCode = RSP_ERR_REG_ADDR;		/* 寄存器地址错误 */
-    }
-//    if (MODS_WriteRegValue(reg, value) == 1)	/* 该函数会把写入的值存入寄存器 */
-//    {}else{
-//        g_tModS.RspCode = RSP_ERR_REG_ADDR;		/* 寄存器地址错误 */
-//    }
-
-err_ret:
-    if (g_tModS.RspCode == RSP_OK)				/* 正确应答 */
-    {
-        MODS_SendAckOk();
-    }
-    else
-    {
-        MODS_SendAckErr(g_tModS.RspCode);		/* 告诉主机命令错误 */
-    }
 }
 /*
 *********************************************************************************************************
@@ -470,50 +331,7 @@ err_ret:
 */
 static void MODS_10H(void)
 {
-	uint16_t reg_addr;
-    uint16_t reg_num;
-    uint8_t byte_num;
-    uint8_t i;
-    uint16_t value;
 
-
-    g_tModS.RspCode = RSP_OK;
-
-    if (g_tModS.RxCount < 11)
-    {
-        g_tModS.RspCode = RSP_ERR_VALUE;			/* 数据值域错误 */
-        goto err_ret;
-    }
-
-    reg_addr = BEBufToUint16(&g_tModS.RxBuf[2]); 	/* 寄存器号 */
-    reg_num = BEBufToUint16(&g_tModS.RxBuf[4]);		/* 寄存器个数 */
-    byte_num = g_tModS.RxBuf[6];					/* 后面的数据体字节数 */
-    if (byte_num != 2 * reg_num) {
-        ;
-    }
-    for (i = 0; i < reg_num; i++)
-    {
-        value = BEBufToUint16(&g_tModS.RxBuf[7 + 2 * i]);	/* 寄存器值 */
-        if (MODS_WriteRegValue(reg_addr + i, value) == 1)
-        {
-            ;
-        }
-        else
-        {
-            g_tModS.RspCode = RSP_ERR_REG_ADDR;		/* 寄存器地址错误 */
-            break;
-        }
-    }
-    
-err_ret:
-    if (g_tModS.RspCode == RSP_OK)					/* 正确应答 */
-    {
-        MODS_SendAckOk();
-    }
-    else
-    {
-        MODS_SendAckErr(g_tModS.RspCode);			/* 告诉主机命令错误 */
-    }
 }
 /*
 *********************************************************************************************************
