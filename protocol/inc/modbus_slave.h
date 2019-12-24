@@ -16,6 +16,7 @@
 #define S_RX_BUF_SIZE		128
 #define S_TX_BUF_SIZE		128
 
+
 typedef struct
 {
 	uint8_t RxBuf[S_RX_BUF_SIZE];
@@ -46,5 +47,21 @@ typedef struct
 	uint16_t D04;
 
 }VAR_SLAVE;
+
+#define REG_D01		0x0101
+#define REG_D02		0x0102
+#define REG_D03		0x0103
+#define REG_D04		0x0104
+#define REG_DXX 	REG_D04
+
+/* 02H ∂¡»° ‰»Î◊¥Ã¨ */
+#define REG_T01		0x0201
+#define REG_T02		0x0202
+#define REG_T03		0x0203
+#define REG_TXX		REG_T03
+
+
+
+
 
 #endif

@@ -1,6 +1,8 @@
 #include "modbus_slave.h"
 #include "bsp_rs485.h"
 #include "bsp_modbus_crc16.h"
+#include "bsp_timer.h"
+#include "bsp_dataconvert.h"
 
 #include<stdio.h>
 #include<string.h>
@@ -32,6 +34,14 @@ static void MODS_RxTimeOut(void)
 */
 void MODS_ReciveNew(uint8_t _byte)
 {
+	uint32_t timeout;
+
+    g_mods_timeout = 0;
+	timeout = 36000000 / SBAUD485;			/* 计算超时时间，单位us 35000000*/
+	bsp_StartHardTimer(1, timeout, (void *)MODS_RxTimeOut);
+	if (g_tModS.RxCount < S_RX_BUF_SIZE){
+		g_tModS.RxBuf[g_tModS.RxCount++] = _byte;
+	}
 	
 }
 
@@ -105,7 +115,61 @@ static void MODS_SendAckOk(void)
 */
 static void MODS_01H(void)
 {
+	uint16_t reg;
+    uint16_t num;
+    uint16_t i;
+    uint16_t m;
+    uint8_t status[10];
 	
+	g_tModS.RspCode = RSP_OK;
+	
+	if (g_tModS.RxCount != 8)
+    {
+        g_tModS.RspCode = RSP_ERR_VALUE;				/* 数据值域错误 */
+        return;
+    }
+	reg = BEBufToUint16(&g_tModS.RxBuf[2]); 			/* 寄存器号 */
+    num = BEBufToUint16(&g_tModS.RxBuf[4]);				/* 寄存器个数 */
+	
+	m = (num + 7) / 8;
+
+    if ((reg >= REG_D01) && (num > 0) && (reg + num <= REG_DXX + 1))
+    {
+        for (i = 0; i < m; i++)
+        {
+            status[i] = 0;
+        }
+        for (i = 0; i < num; i++)
+        {
+//			if (bsp_IsLedOn(i + 1 + reg - REG_D01))		/* 读LED的状态，写入状态寄存器的每一位 */
+//			{
+//				status[i / 8] |= (1 << (i % 8));
+//			}
+        }
+    }
+    else
+    {
+        g_tModS.RspCode = RSP_ERR_REG_ADDR;				/* 寄存器地址错误 */
+    }
+
+    if (g_tModS.RspCode == RSP_OK)						/* 正确应答 */
+    {
+        g_tModS.TxCount = 0;
+        g_tModS.TxBuf[g_tModS.TxCount++] = g_tModS.RxBuf[0];
+        g_tModS.TxBuf[g_tModS.TxCount++] = g_tModS.RxBuf[1];
+        g_tModS.TxBuf[g_tModS.TxCount++] = m;			/* 返回字节数 */
+
+        for (i = 0; i < m; i++)
+        {
+            g_tModS.TxBuf[g_tModS.TxCount++] = status[i];	/* 继电器状态 */
+        }
+
+        MODS_SendWithCRC(g_tModS.TxBuf, g_tModS.TxCount);
+    }
+    else
+    {
+        MODS_SendAckErr(g_tModS.RspCode);				/* 告诉主机命令错误 */
+    }
 }
 /*
 *********************************************************************************************************
@@ -117,6 +181,60 @@ static void MODS_01H(void)
 */
 static void MODS_02H(void)
 {
+	uint16_t reg;
+    uint16_t num;
+    uint16_t i;
+    uint16_t m;
+    uint8_t status[10];
+
+    g_tModS.RspCode = RSP_OK;
+
+    if (g_tModS.RxCount != 8)
+    {
+        g_tModS.RspCode = RSP_ERR_VALUE;				/* 数据值域错误 */
+        return;
+    }
+
+    reg = BEBufToUint16(&g_tModS.RxBuf[2]); 			/* 寄存器号 */
+    num = BEBufToUint16(&g_tModS.RxBuf[4]);				/* 寄存器个数 */
+
+    m = (num + 7) / 8;
+    if ((reg >= REG_T01) && (num > 0) && (reg + num <= REG_TXX + 1))
+    {
+        for (i = 0; i < m; i++)
+        {
+            status[i] = 0;
+        }
+        for (i = 0; i < num; i++)
+        {
+//			if (bsp_GetKeyState((KEY_ID_E)(KID_K1 + reg - REG_T01 + i)))
+//			{
+//				status[i / 8] |= (1 << (i % 8));
+//			}
+        }
+    }
+    else
+    {
+        g_tModS.RspCode = RSP_ERR_REG_ADDR;				/* 寄存器地址错误 */
+    }
+
+    if (g_tModS.RspCode == RSP_OK)						/* 正确应答 */
+    {
+        g_tModS.TxCount = 0;
+        g_tModS.TxBuf[g_tModS.TxCount++] = g_tModS.RxBuf[0];
+        g_tModS.TxBuf[g_tModS.TxCount++] = g_tModS.RxBuf[1];
+        g_tModS.TxBuf[g_tModS.TxCount++] = m;			/* 返回字节数 */
+
+        for (i = 0; i < m; i++)
+        {
+            g_tModS.TxBuf[g_tModS.TxCount++] = status[i];	/* T01-02状态 */
+        }
+        MODS_SendWithCRC(g_tModS.TxBuf, g_tModS.TxCount);
+    }
+    else
+    {
+        MODS_SendAckErr(g_tModS.RspCode);				/* 告诉主机命令错误 */
+    }
 }
 /*
 *********************************************************************************************************
@@ -228,6 +346,38 @@ static void MODS_AnalyzeApp(void)
 */
 void MODS_Poll(void)
 {
+	uint16_t addr;
+    uint16_t crc1;
+
+    /* 超过3.5个字符时间后执行MODH_RxTimeOut()函数。全局变量 g_rtu_timeout = 1; 通知主程序开始解码 */
+    if (g_mods_timeout == 0)
+    {
+        return;								/* 没有超时，继续接收。不要清零 g_tModS.RxCount */
+    }
+    g_mods_timeout = 0;	 					/* 清标志 */
 	
+	
+	if (g_tModS.RxCount < 4)				/* 接收到的数据小于4个字节就认为错误 */
+    {
+        goto err_ret;
+    }
+    /* 计算CRC校验和 */
+    crc1 = CRC16_Modbus(g_tModS.RxBuf, g_tModS.RxCount);
+    if (crc1 != 0)
+    {
+        printf("\r\ncrc check failed");
+        goto err_ret;
+    }
+	addr = g_tModS.RxBuf[0];				/* 第1字节 站号 */
+    if (addr != SADDR485) {   /* 判断主机发送的命令地址是否符合 */
+        goto err_ret;
+    }
+//    else if(addr==0){
+//
+//    }
+    /* 分析应用层协议 */
+    MODS_AnalyzeApp();
+err_ret:
+    g_tModS.RxCount = 0;					/* 必须清零计数器，方便下次帧同步 */
 }
 
