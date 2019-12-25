@@ -68,5 +68,7 @@ typedef struct
 #define REG_A01		0x0401
 #define REG_AXX		REG_A01
 
+void MODS_ReciveNew(uint8_t _byte);
+
 
 #endif

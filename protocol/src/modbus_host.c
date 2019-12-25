@@ -12,14 +12,13 @@
 void bsp_Idle(void);
 void MODH_AnalyzeApp(void);
 MODH_T g_tModH;	//modbus host protocol data buff
-VAR_HOST g_tvar_host;
+VAR_HOST g_tVarH;
 uint8_t g_modh_timeout = 0; //timeout flag
 
 void MODH_RxTimeOut(void)
 {
     g_modh_timeout = 1;
 }
-
 /*
 *********************************************************************************************************
 *	函 数 名: MODH_SendPacket
@@ -250,7 +249,31 @@ static void MODH_Read_01H(void)
 }
 static void MODH_Read_02H(void)
 {
-	
+	uint8_t bytes;
+    uint8_t *p;
+
+    if (g_tModH.RxCount > 0)
+    {
+        bytes = g_tModH.RxBuf[2];	/* 数据长度 字节数 */
+        switch (g_tModH.Reg02H)
+        {
+        case REG_T01:
+            if (bytes == 6)
+            {
+                p = &g_tModH.RxBuf[3];
+
+                g_tVarH.T01 = BEBufToUint16(p);
+                p += 2;	/* 寄存器 */
+                g_tVarH.T02 = BEBufToUint16(p);
+                p += 2;	/* 寄存器 */
+                g_tVarH.T03 = BEBufToUint16(p);
+                p += 2;	/* 寄存器 */
+
+                g_tModH.fAck02H = 1;
+            }
+            break;
+        }
+    }
 }
 static void MODH_Read_03H(void)
 {
@@ -261,7 +284,7 @@ static void MODH_Read_03H(void)
 		bytes = g_tModH.RxBuf[2];	/* 数据长度 字节数 */
 		for(i=0;i<bytes/2;i++)
 		{
-			g_tvar_host.DR[i]=BEBufToUint16(p);	//modbus 协议采用大端模式传输数据
+			g_tVarH.DR[i]=BEBufToUint16(p);	//modbus 协议采用大端模式传输数据
 			p+=2;
 		}
 		g_tModH.fAck03H = 1;
@@ -293,6 +316,74 @@ static void MODH_Read_04H(void)
 
     }
 }
+/*
+*********************************************************************************************************
+*	函 数 名: MODH_Read_05H
+*	功能说明: 分析05H指令的应答数据
+*	形    参: 无
+*	返 回 值: 无
+*********************************************************************************************************
+*/
+static void MODH_Read_05H(void)
+{
+    if (g_tModH.RxCount > 0)
+    {
+        if (g_tModH.RxBuf[0] == SlaveAddr)
+        {
+            g_tModH.fAck05H = 1;		/* 接收到应答 */
+        }
+    };
+}
+
+/*
+*********************************************************************************************************
+*	函 数 名: MODH_Read_06H
+*	功能说明: 分析06H指令的应答数据
+*	形    参: 无
+*	返 回 值: 无
+*********************************************************************************************************
+*/
+static void MODH_Read_06H(void)
+{
+    if (g_tModH.RxCount > 0)
+    {
+        if (g_tModH.RxBuf[0] == SlaveAddr)
+        {
+            g_tModH.fAck06H = 1;		/* 接收到应答 */
+        }
+    }
+}
+
+/*
+*********************************************************************************************************
+*	函 数 名: MODH_Read_10H
+*	功能说明: 分析10H指令的应答数据
+*	形    参: 无
+*	返 回 值: 无
+*********************************************************************************************************
+*/
+void MODH_Read_10H(void)
+{
+    /*
+    	10H指令的应答:
+    		从机地址                11
+    		功能码                  10
+    		寄存器起始地址高字节	00
+    		寄存器起始地址低字节    01
+    		寄存器数量高字节        00
+    		寄存器数量低字节        02
+    		CRC校验高字节           12
+    		CRC校验低字节           98
+    */
+    if (g_tModH.RxCount > 0)
+    {
+        if (g_tModH.RxBuf[0] == SlaveAddr)
+        {
+            g_tModH.fAck10H = 1;		/* 接收到应答 */
+        }
+    }
+}
+
 /*
 *********************************************************************************************************
 *	函 数 名: MODH_Poll
@@ -345,17 +436,22 @@ void MODH_AnalyzeApp(void)
 			MODH_Read_01H();
 			break;
 		case 0x02:
+			MODH_Read_02H();
 			break;
 		case 0x03:
+			MODH_Read_03H();
 			break;
 		case 0x04:
 			MODH_Read_04H();
 			break;
 		case 0x05:
+			MODH_Read_05H();
 			break;
 		case 0x06:
+			MODH_Read_06H();
 			break;
 		case 0x10:
+			MODH_Read_10H();
 			break;
 	}
 }
@@ -399,6 +495,99 @@ uint8_t MODH_ReadParam_01H(uint8_t addr,uint16_t _reg, uint16_t _num)
         return 1;	/* 01H 读成功 */
     }
 }
+/*
+*********************************************************************************************************
+*	函 数 名: MODH_ReadParam_02H
+*	功能说明: 单个参数. 通过发送02H指令实现，发送之后，等待从机应答。
+*	形    参: 无
+*	返 回 值: 1 表示成功。0 表示失败（通信超时或被拒绝）
+*********************************************************************************************************
+*/
+uint8_t MODH_ReadParam_02H(uint16_t _reg, uint16_t _num)
+{
+    int32_t time1;
+    uint8_t i;
+
+    for (i = 0; i < NUM; i++)
+    {
+        MODH_Send02H (SlaveAddr, _reg, _num);
+        time1 = bsp_GetRunTime();	/* 记录命令发送的时刻 */
+        while (1)
+        {
+            bsp_Idle();
+            if (bsp_CheckRunTime(time1) > TIMEOUT)
+            {
+                break;		/* 通信超时了 */
+            }
+            if (g_tModH.fAck02H > 0)
+            {
+                break;
+            }
+        }
+        if (g_tModH.fAck02H > 0)
+        {
+            break;
+        }
+    }
+
+    if (g_tModH.fAck02H == 0)
+    {
+        return 0;
+    }
+    else
+    {
+        return 1;	/* 02H 读成功 */
+    }
+}
+/*
+*********************************************************************************************************
+*	函 数 名: MODH_ReadParam_03H
+*	功能说明: 单个参数. 通过发送03H指令实现，发送之后，等待从机应答。
+*	形    参: 无
+*	返 回 值: 1 表示成功。0 表示失败（通信超时或被拒绝）
+*********************************************************************************************************
+*/
+uint8_t MODH_ReadParam_03H(uint8_t _addr,uint16_t _reg, uint16_t _num)
+{
+    int32_t time1;
+    uint8_t i;
+
+    for (i = 0; i < NUM; i++)
+    {
+        MODH_Send03H (_addr, _reg, _num);
+        time1 = bsp_GetRunTime();	/* 记录命令发送的时刻 */
+
+        while (1)
+        {
+            bsp_Idle();
+
+            if (bsp_CheckRunTime(time1) > TIMEOUT)
+            {
+                break;		/* 通信超时了 */
+            }
+
+            if (g_tModH.fAck03H > 0)
+            {
+                break;
+            }
+        }
+
+        if (g_tModH.fAck03H > 0)
+        {
+            break;
+        }
+    }
+
+    if (g_tModH.fAck03H == 0)
+    {
+        return 0;	/* 通信超时了 */
+    }
+    else
+    {
+        return 1;	/* 写入03H参数成功 */
+    }
+}
+
 /*
 *********************************************************************************************************
 *	函 数 名: MODH_ReadParam_04H
@@ -445,5 +634,153 @@ uint8_t MODH_ReadParam_04H(uint8_t _addr,uint16_t _reg, uint16_t _num)
     else
     {
         return 1;	/* 04H 读成功 */
+    }
+}
+
+/*
+*********************************************************************************************************
+*	函 数 名: MODH_WriteParam_05H
+*	功能说明: 单个参数. 通过发送05H指令实现，发送之后，等待从机应答。
+*	形    参: 无
+*	返 回 值: 1 表示成功。0 表示失败（通信超时或被拒绝）
+*********************************************************************************************************
+*/
+uint8_t MODH_WriteParam_05H(uint16_t _reg, uint16_t _value)
+{
+    int32_t time1;
+    uint8_t i;
+
+    for (i = 0; i < NUM; i++)
+    {
+        MODH_Send05H (SlaveAddr, _reg, _value);
+        time1 = bsp_GetRunTime();	/* 记录命令发送的时刻 */
+
+        while (1)
+        {
+            bsp_Idle();
+
+            /* 超时大于 TIMEOUT，则认为异常 */
+            if (bsp_CheckRunTime(time1) > TIMEOUT)
+            {
+                break;	/* 通信超时了 */
+            }
+
+            if (g_tModH.fAck05H > 0)
+            {
+                break;
+            }
+        }
+
+        if (g_tModH.fAck05H > 0)
+        {
+            break;
+        }
+    }
+
+    if (g_tModH.fAck05H == 0)
+    {
+        return 0;	/* 通信超时了 */
+    }
+    else
+    {
+        return 1;	/* 05H 写成功 */
+    }
+}
+
+/*
+*********************************************************************************************************
+*	函 数 名: MODH_WriteParam_06H
+*	功能说明: 单个参数. 通过发送06H指令实现，发送之后，等待从机应答。循环NUM次写命令
+*	形    参: 无
+*	返 回 值: 1 表示成功。0 表示失败（通信超时或被拒绝）
+*********************************************************************************************************
+*/
+uint8_t MODH_WriteParam_06H(uint8_t _addr,uint16_t _reg, uint16_t _value)
+{
+    int32_t time1;
+    uint8_t i;
+
+    for (i = 0; i < NUM; i++)
+    {
+        MODH_Send06H (_addr, _reg, _value);
+        time1 = bsp_GetRunTime();	/* 记录命令发送的时刻 */
+
+        while (1)
+        {
+            bsp_Idle();
+
+            if (bsp_CheckRunTime(time1) > TIMEOUT)
+            {
+                break;
+            }
+
+            if (g_tModH.fAck06H > 0)
+            {
+                break;
+            }
+        }
+
+        if (g_tModH.fAck06H > 0)
+        {
+            break;
+        }
+    }
+
+    if (g_tModH.fAck06H == 0)
+    {
+        return 0;	/* 通信超时了 */
+    }
+    else
+    {
+        return 1;	/* 写入06H参数成功 */
+    }
+}
+
+/*
+*********************************************************************************************************
+*	函 数 名: MODH_WriteParam_10H
+*	功能说明: 单个参数. 通过发送10H指令实现，发送之后，等待从机应答。循环NUM次写命令
+*	形    参: 无
+*	返 回 值: 1 表示成功。0 表示失败（通信超时或被拒绝）
+*********************************************************************************************************
+*/
+uint8_t MODH_WriteParam_10H(uint8_t _addr,uint16_t _reg, uint8_t _num, uint8_t *_buf)
+{
+    int32_t time1;
+    uint8_t i;
+
+    for (i = 0; i < NUM; i++)
+    {
+        MODH_Send10H(_addr, _reg, _num, _buf);
+        time1 = bsp_GetRunTime();	/* 记录命令发送的时刻 */
+
+        while (1)
+        {
+            bsp_Idle();
+
+            if (bsp_CheckRunTime(time1) > TIMEOUT)
+            {
+                break;
+            }
+
+            if (g_tModH.fAck10H > 0)
+            {
+                break;
+            }
+        }
+
+        if (g_tModH.fAck10H > 0)
+        {
+            break;
+        }
+    }
+
+    if (g_tModH.fAck10H == 0)
+    {
+        return 0;	/* 通信超时了 */
+    }
+    else
+    {
+        return 1;	/* 写入10H参数成功 */
     }
 }

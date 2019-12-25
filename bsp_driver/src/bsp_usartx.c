@@ -3,6 +3,8 @@
 #include "bsp_led.h"
 #include<stdio.h>
 #include "modbus_host.h"
+#include "modbus_slave.h"
+#include "bsp.h"
 
 
 /* 定义每个串口结构体变量 */
@@ -30,11 +32,29 @@ char g_RxBuf4[UART4_RX_BUF_SIZE];		/* 接收缓冲区 */
 #endif
 
 #if UART5_FIFO_EN == 1
-
+UART_T g_tUart5;
 char g_TxBuf5[UART5_TX_BUF_SIZE];		/* 发送缓冲区 */
 char g_RxBuf5[UART5_RX_BUF_SIZE];		/* 接收缓冲区 */
 #endif
-
+void UartVarInit(void)
+{
+	#if UART5_FIFO_EN == 1
+    g_tUart5.uart = UART5;						/* STM32 串口设备 */
+    g_tUart5.pTxBuf = g_TxBuf5;					/* 发送缓冲区指针 */
+    g_tUart5.pRxBuf = g_RxBuf5;					/* 接收缓冲区指针 */
+    g_tUart5.usTxBufSize = UART5_TX_BUF_SIZE;	/* 发送缓冲区大小 */
+    g_tUart5.usRxBufSize = UART5_RX_BUF_SIZE;	/* 接收缓冲区大小 */
+    g_tUart5.usTxWrite = 0;						/* 发送FIFO写索引 */
+    g_tUart5.usTxRead = 0;						/* 发送FIFO读索引 */
+    g_tUart5.usRxWrite = 0;						/* 接收FIFO写索引 */
+    g_tUart5.usRxRead = 0;						/* 接收FIFO读索引 */
+    g_tUart5.usRxCount = 0;						/* 接收到的新数据个数 */
+    g_tUart5.usTxCount = 0;						/* 待发送的数据个数 */
+    g_tUart5.SendBefor = RS485_Slave_SendBefor;	/* 发送数据前的回调函数 */
+    g_tUart5.SendOver = RS485_Slave_SendOver;	/* 发送完毕后的回调函数 */
+    g_tUart5.ReciveNew = MODS_ReciveNew;	/* 接收到新数据后的回调函数 */
+#endif
+}
 void InitHardUart(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
@@ -348,9 +368,36 @@ void uart4_dma_recvmsg()
     DMA_Cmd(DMA2_Channel3, ENABLE);
 	
 }
-void uart5_send_buf()
+void uart5_send_buf(char *msg,uint16_t len)
 {
-	
+	uint16_t i;
+
+    for (i = 0; i < len; i++)
+	{
+		while (1)
+        {
+            __IO uint16_t usCount;
+
+            DISABLE_INT();
+            usCount = g_tUart5.usTxCount;
+            ENABLE_INT();
+
+            if (usCount < g_tUart5.usTxBufSize)
+            {
+                break;
+            }
+        }
+		g_tUart5.pTxBuf[g_tUart5.usTxWrite] = msg[i];
+
+        DISABLE_INT();
+        if (++g_tUart5.usTxWrite >= g_tUart5.usTxBufSize)
+        {
+            g_tUart5.usTxWrite = 0;
+        }
+        g_tUart5.usTxCount++;
+        ENABLE_INT();
+	}
+	USART_ITConfig(UART5, USART_IT_TXE, ENABLE);
 }
 int fputc(int ch, FILE *f)
 {
@@ -455,8 +502,75 @@ void UART5_IRQHandler(void)
 	if(USART_GetITStatus(UART5,USART_IT_RXNE)!=RESET)
 	{
 		ch=USART_ReceiveData(UART5);
-		printf("%c",ch);
+		g_tUart5.pRxBuf[g_tUart5.usRxWrite] = ch;
+        if (++g_tUart5.usRxWrite >= g_tUart5.usRxBufSize)
+        {
+            g_tUart5.usRxWrite = 0;
+        }
+        if (g_tUart5.usRxCount < g_tUart5.usRxBufSize)
+        {
+            g_tUart5.usRxCount++;
+        }
+		{
+            if (g_tUart5.ReciveNew)
+            {
+                g_tUart5.ReciveNew(ch);
+            }
+        }
+		
 	}
+	/* 处理发送缓冲区空中断 */
+    if (USART_GetITStatus(g_tUart5.uart, USART_IT_TXE) != RESET)
+    {
+
+        //if (_pUart->usTxRead == _pUart->usTxWrite)
+        if (g_tUart5.usTxCount == 0)
+        {
+            /* 发送缓冲区的数据已取完时， 禁止发送缓冲区空中断 （注意：此时最后1个数据还未真正发送完毕）*/
+            USART_ITConfig(g_tUart5.uart, USART_IT_TXE, DISABLE);
+
+            /* 使能数据发送完毕中断 */
+            USART_ITConfig(g_tUart5.uart, USART_IT_TC, ENABLE);
+        }
+        else
+        {
+            /* 从发送FIFO取1个字节写入串口发送数据寄存器 */
+            USART_SendData(g_tUart5.uart, g_tUart5.pTxBuf[g_tUart5.usTxRead]);
+            if (++g_tUart5.usTxRead >= g_tUart5.usTxBufSize)
+            {
+                g_tUart5.usTxRead = 0;
+            }
+            g_tUart5.usTxCount--;
+        }
+    }
+    /* 数据bit位全部发送完毕的中断 */
+    else if (USART_GetITStatus(g_tUart5.uart, USART_IT_TC) != RESET)
+    {
+        //if (_pUart->usTxRead == _pUart->usTxWrite)
+        if (g_tUart5.usTxCount == 0)
+        {
+            /* 如果发送FIFO的数据全部发送完毕，禁止数据发送完毕中断 */
+            USART_ITConfig(g_tUart5.uart, USART_IT_TC, DISABLE);
+
+            /* 回调函数, 一般用来处理RS485通信，将RS485芯片设置为接收模式，避免抢占总线 */
+            if (g_tUart5.SendOver)
+            {
+                g_tUart5.SendOver();
+            }
+        }
+        else
+        {
+            /* 正常情况下，不会进入此分支 */
+
+            /* 如果发送FIFO的数据还未完毕，则从发送FIFO取1个数据写入发送数据寄存器 */
+            USART_SendData(g_tUart5.uart, g_tUart5.pTxBuf[g_tUart5.usTxRead]);
+            if (++g_tUart5.usTxRead >= g_tUart5.usTxBufSize)
+            {
+                g_tUart5.usTxRead = 0;
+            }
+            g_tUart5.usTxCount--;
+        }
+    }
 }
 #endif
 

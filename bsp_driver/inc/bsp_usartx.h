@@ -52,6 +52,25 @@ typedef enum
 	#define UART5_RX_BUF_SIZE	1*256
 #endif
 
+typedef struct
+{
+	USART_TypeDef *uart;		/* STM32内部串口设备指针 */
+	char *pTxBuf;			/* 发送缓冲区 */
+	char *pRxBuf;			/* 接收缓冲区 */
+	uint16_t usTxBufSize;		/* 发送缓冲区大小 */
+	uint16_t usRxBufSize;		/* 接收缓冲区大小 */
+	__IO uint16_t usTxWrite;	/* 发送缓冲区写指针 */
+	__IO uint16_t usTxRead;		/* 发送缓冲区读指针 */
+	__IO uint16_t usTxCount;	/* 等待发送的数据个数 */
+
+	__IO uint16_t usRxWrite;	/* 接收缓冲区写指针 */
+	__IO uint16_t usRxRead;		/* 接收缓冲区读指针 */
+	__IO uint16_t usRxCount;	/* 还未读取的新数据个数 */
+
+	void (*SendBefor)(void); 	/* 开始发送之前的回调函数指针（主要用于RS485切换到发送模式） */
+	void (*SendOver)(void); 	/* 发送完毕的回调函数指针（主要用于RS485将发送模式切换为接收模式） */
+	void (*ReciveNew)(uint8_t _byte);	/* 串口收到数据的回调函数指针 */
+}UART_T;
 
 void bsp_usart_init(void);
 
