@@ -154,7 +154,7 @@
           <Type>0</Type>
           <LineNumber>604</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134221936</Address>
+          <Address>134222494</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
@@ -168,18 +168,34 @@
         <Bp>
           <Number>1</Number>
           <Type>0</Type>
-          <LineNumber>654</LineNumber>
+          <LineNumber>26</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>0</Address>
+          <Address>134222756</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
           <SizeOfObject>0</SizeOfObject>
           <BreakByAccess>0</BreakByAccess>
-          <BreakIfRCount>0</BreakIfRCount>
+          <BreakIfRCount>1</BreakIfRCount>
           <Filename>..\protocol\src\modbus_slave.c</Filename>
           <ExecCommand></ExecCommand>
-          <Expression></Expression>
+          <Expression>\\modbus\../protocol/src/modbus_slave.c\26</Expression>
+        </Bp>
+        <Bp>
+          <Number>2</Number>
+          <Type>0</Type>
+          <LineNumber>640</LineNumber>
+          <EnabledFlag>1</EnabledFlag>
+          <Address>134222556</Address>
+          <ByteObject>0</ByteObject>
+          <HtxType>0</HtxType>
+          <ManyObjects>0</ManyObjects>
+          <SizeOfObject>0</SizeOfObject>
+          <BreakByAccess>0</BreakByAccess>
+          <BreakIfRCount>1</BreakIfRCount>
+          <Filename>..\protocol\src\modbus_slave.c</Filename>
+          <ExecCommand></ExecCommand>
+          <Expression>\\modbus\../protocol/src/modbus_slave.c\640</Expression>
         </Bp>
       </Breakpoint>
       <Tracepoint>

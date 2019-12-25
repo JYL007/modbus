@@ -5,10 +5,10 @@
 
 #define	UART1_FIFO_EN	1
 #define	UART2_FIFO_EN	0
-#define	UART3_FIFO_EN	0
+#define	UART3_FIFO_EN	1
 #define	UART4_FIFO_EN	1
 #define	UART5_FIFO_EN	1
-
+#define USART3_DR_Base  (USART3_BASE+0x04)
 #define USART4_DR_Base  (UART4_BASE+0x04)		// 0x40013800 + 0x04 = 0x40013804
 
 
@@ -36,7 +36,7 @@ typedef enum
 #if UART3_FIFO_EN == 1
 	#define UART3_BAUD			9600
 	#define UART3_TX_BUF_SIZE	1*256
-	#define UART3_RX_BUF_SIZE	1*256
+	#define UART3_RX_BUF_SIZE	1*1024
 #endif
 
 
@@ -73,7 +73,7 @@ typedef struct
 }UART_T;
 
 void bsp_usart_init(void);
-
+void uart3_dma_sendmsg(char *msg, uint16_t len);
 void uart4_dma_sendmsg(char *msg,uint16_t len);
 void uart5_send_buf(char *msg,uint16_t len);
 #endif

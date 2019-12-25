@@ -6,8 +6,12 @@
 #include "bsp_dma.h"
 #include "modbus_host.h"
 
+extern char g_TxBuf3[UART3_TX_BUF_SIZE];		/* 发送缓冲区 */
+extern char g_RxBuf3[UART3_RX_BUF_SIZE];		/* 接收缓冲区 */
+
 extern char g_TxBuf4[UART4_TX_BUF_SIZE];		/* 发送缓冲区 */
 extern char g_RxBuf4[UART4_RX_BUF_SIZE];		/* 发送缓冲区 */
+
 extern MODH_T g_tModH;	//modbus host protocol data buff
 void bsp_board_init(void)
 {
@@ -17,6 +21,8 @@ void bsp_board_init(void)
 	bsp_timer_init();
 	RS485_Host_InitTXE();
 	RS485_Slave_InitTXE();
+	dma1_channel2_init(USART3_DR_Base,(uint32_t)g_TxBuf3,1000,DMA_DIR_PeripheralDST);
+	dma1_channel3_init(USART3_DR_Base,(uint32_t)g_RxBuf3,1024,DMA_DIR_PeripheralSRC);
 	dma2_channel5_init(USART4_DR_Base,(uint32_t)g_TxBuf4,1000,DMA_DIR_PeripheralDST);
 	dma2_channel3_init(USART4_DR_Base,(uint32_t)g_tModH.RxBuf,1000,DMA_DIR_PeripheralSRC);
 }

@@ -177,8 +177,9 @@ void InitHardUart(void)
     USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
     USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
     USART_Init(USART3, &USART_InitStructure);
-
-    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);	/* 使能接收中断 */
+	USART_DMACmd(USART3, USART_DMAReq_Rx, ENABLE);
+//    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);	/* 使能接收中断 */
+	USART_ITConfig(USART3, USART_IT_IDLE, ENABLE);	/* 使能空闲中断 */
     /*
     	USART_ITConfig(USART1, USART_IT_TXE, ENABLE);
     	注意: 不要在此处打开发送中断
@@ -349,6 +350,24 @@ void bsp_usart_init(void)
     InitHardUart();
     ConfigUartNVIC();
 }
+void uart3_dma_sendmsg(char *msg, uint16_t len)
+{
+	DMA_ClearFlag(DMA1_FLAG_TC2);
+    USART_ClearITPendingBit(USART3, USART_IT_TC);
+    DMA_Cmd(DMA1_Channel2, DISABLE);
+    DMA1_Channel2->CMAR = (uint32_t)msg;
+    DMA1_Channel2->CNDTR = len;
+    USART_ITConfig(USART3, USART_IT_TC, ENABLE);
+    DMA_Cmd(DMA1_Channel2, ENABLE);
+    USART_DMACmd(USART3, USART_DMAReq_Tx, ENABLE);
+}
+void uart3_dma_recvmsg(void)
+{
+	DMA_Cmd(DMA1_Channel3,DISABLE);
+	DMA_ClearFlag(DMA1_FLAG_GL3);
+	DMA1_Channel3->CNDTR=1024;
+	DMA_Cmd(DMA1_Channel3,ENABLE);
+}
 void uart4_dma_sendmsg(char *msg, uint16_t len)
 {
     DMA_ClearFlag(DMA2_FLAG_TC5);
@@ -360,7 +379,7 @@ void uart4_dma_sendmsg(char *msg, uint16_t len)
     DMA_Cmd(DMA2_Channel5, ENABLE);
     USART_DMACmd(UART4, USART_DMAReq_Tx, ENABLE);
 }
-void uart4_dma_recvmsg()
+void uart4_dma_recvmsg(void)
 {
     DMA_Cmd(DMA2_Channel3, DISABLE);
     DMA_ClearFlag( DMA2_FLAG_GL3 );
@@ -402,7 +421,13 @@ if (g_tUart5.SendBefor != 0)
         ENABLE_INT();
 
     }
-
+	{
+		uint8_t j;
+		for(j=0;j<g_tUart5.usTxCount;j++)
+		{
+			printf("%02X ",g_tUart5.pTxBuf[j]);
+		}
+	}
     USART_ITConfig(g_tUart5.uart, USART_IT_TXE, ENABLE);
 }
 int fputc(int ch, FILE *f)
@@ -443,7 +468,6 @@ int fgetc(FILE *f)
 void USART1_IRQHandler(void)
 {
 
-
 }
 #endif
 #if UART2_FIFO_EN==1
@@ -455,7 +479,25 @@ void USART2_IRQHandler(void)
 #if UART3_FIFO_EN==1
 void USART3_IRQHandler(void)
 {
-
+	uint8_t ch;
+//	if(USART_GetITStatus(USART3, USART_IT_RXNE) != RESET)
+//    {
+//        ch = USART_ReceiveData(USART3);
+//		printf("%c",ch);
+//	}
+	if(USART_GetITStatus(USART3, USART_IT_IDLE) != RESET)
+	{
+		
+		printf("recv cnt:%d", 1024-DMA_GetCurrDataCounter(DMA1_Channel3));
+		USART_ReceiveData(USART3);
+		uart3_dma_recvmsg();
+	}
+	if(USART_GetITStatus(USART3, USART_IT_TC) != RESET)
+	{
+		USART_ClearITPendingBit(USART3, USART_IT_TC);
+        USART_ITConfig(USART3, USART_IT_TC, DISABLE);
+	}
+	
 }
 #endif
 #if UART4_FIFO_EN==1
