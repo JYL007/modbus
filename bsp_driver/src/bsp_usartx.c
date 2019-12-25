@@ -38,7 +38,7 @@ char g_RxBuf5[UART5_RX_BUF_SIZE];		/* 接收缓冲区 */
 #endif
 void UartVarInit(void)
 {
-	#if UART5_FIFO_EN == 1
+#if UART5_FIFO_EN == 1
     g_tUart5.uart = UART5;						/* STM32 串口设备 */
     g_tUart5.pTxBuf = g_TxBuf5;					/* 发送缓冲区指针 */
     g_tUart5.pRxBuf = g_RxBuf5;					/* 接收缓冲区指针 */
@@ -218,9 +218,9 @@ void InitHardUart(void)
     USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
     USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
     USART_Init(UART4, &USART_InitStructure);
-	USART_DMACmd(UART4, USART_DMAReq_Rx, ENABLE);
+    USART_DMACmd(UART4, USART_DMAReq_Rx, ENABLE);
 //    USART_ITConfig(UART4, USART_IT_RXNE, ENABLE);	/* 使能接收中断 */
-	USART_ITConfig(UART4, USART_IT_IDLE, ENABLE);	/* 使能空闲中断 */
+    USART_ITConfig(UART4, USART_IT_IDLE, ENABLE);	/* 使能空闲中断 */
     /*
     	USART_ITConfig(USART1, USART_IT_TXE, ENABLE);
     	注意: 不要在此处打开发送中断
@@ -336,7 +336,7 @@ void ConfigUartNVIC(void)
 
 void uart4_tx_dma_init(void)
 {
-	
+
 }
 void uart4_rx_dma_init(void)
 {
@@ -345,36 +345,40 @@ void uart4_rx_dma_init(void)
 
 void bsp_usart_init(void)
 {
+    UartVarInit();
     InitHardUart();
     ConfigUartNVIC();
 }
-void uart4_dma_sendmsg(char *msg,uint16_t len)
+void uart4_dma_sendmsg(char *msg, uint16_t len)
 {
-	DMA_ClearFlag(DMA2_FLAG_TC5);
-	USART_ClearITPendingBit(UART4,USART_IT_TC);
-	DMA_Cmd(DMA2_Channel5,DISABLE);
-	DMA2_Channel5->CMAR=(uint32_t)msg;
-	DMA2_Channel5->CNDTR=len;
-	USART_ITConfig(UART4,USART_IT_TC,ENABLE);
-	DMA_Cmd(DMA2_Channel5,ENABLE);
-	USART_DMACmd(UART4, USART_DMAReq_Tx, ENABLE);	
+    DMA_ClearFlag(DMA2_FLAG_TC5);
+    USART_ClearITPendingBit(UART4, USART_IT_TC);
+    DMA_Cmd(DMA2_Channel5, DISABLE);
+    DMA2_Channel5->CMAR = (uint32_t)msg;
+    DMA2_Channel5->CNDTR = len;
+    USART_ITConfig(UART4, USART_IT_TC, ENABLE);
+    DMA_Cmd(DMA2_Channel5, ENABLE);
+    USART_DMACmd(UART4, USART_DMAReq_Tx, ENABLE);
 }
 void uart4_dma_recvmsg()
 {
-	DMA_Cmd(DMA2_Channel3, DISABLE);
-	DMA_ClearFlag( DMA2_FLAG_GL3 );
+    DMA_Cmd(DMA2_Channel3, DISABLE);
+    DMA_ClearFlag( DMA2_FLAG_GL3 );
     //  重新赋值计数值，必须大于等于最大可能接收到的数据帧数目
     DMA2_Channel3->CNDTR = 1000;
     DMA_Cmd(DMA2_Channel3, ENABLE);
-	
-}
-void uart5_send_buf(char *msg,uint16_t len)
-{
-	uint16_t i;
 
+}
+void uart5_send_buf(char *msg, uint16_t len)
+{
+    uint16_t i;
+if (g_tUart5.SendBefor != 0)
+    {
+        g_tUart5.SendBefor();		/* 如果是RS485通信，可以在这个函数中将RS485设置为发送模式 */
+    }
     for (i = 0; i < len; i++)
-	{
-		while (1)
+    {
+        while (1)
         {
             __IO uint16_t usCount;
 
@@ -387,7 +391,7 @@ void uart5_send_buf(char *msg,uint16_t len)
                 break;
             }
         }
-		g_tUart5.pTxBuf[g_tUart5.usTxWrite] = msg[i];
+        g_tUart5.pTxBuf[g_tUart5.usTxWrite] = msg[i];
 
         DISABLE_INT();
         if (++g_tUart5.usTxWrite >= g_tUart5.usTxBufSize)
@@ -396,8 +400,10 @@ void uart5_send_buf(char *msg,uint16_t len)
         }
         g_tUart5.usTxCount++;
         ENABLE_INT();
-	}
-	USART_ITConfig(UART5, USART_IT_TXE, ENABLE);
+
+    }
+
+    USART_ITConfig(g_tUart5.uart, USART_IT_TXE, ENABLE);
 }
 int fputc(int ch, FILE *f)
 {
@@ -443,7 +449,7 @@ void USART1_IRQHandler(void)
 #if UART2_FIFO_EN==1
 void USART2_IRQHandler(void)
 {
-	
+
 }
 #endif
 #if UART3_FIFO_EN==1
@@ -468,41 +474,41 @@ void UART4_IRQHandler(void)
 //	}
     if(USART_GetITStatus(UART4, USART_IT_IDLE) != RESET)
     {
-		printf("recv cnt:%d",DMA_GetCurrDataCounter(DMA2_Channel3));
-		g_modh_timeout=1;
-		USART_ReceiveData(UART4);
-		printf("idle");
-		RGB_Light(YELLOW);
-		
-		{
-			uint8_t i;
-			for(i=0;i<1000-DMA_GetCurrDataCounter(DMA2_Channel3);i++)
-			{
-				printf("%d:%02X ",i,g_RxBuf4[i]);
-			}
-		}
-		g_tModH.RxCount=1000-DMA_GetCurrDataCounter(DMA2_Channel3);
-		uart4_dma_recvmsg();
-		
+        printf("recv cnt:%d", DMA_GetCurrDataCounter(DMA2_Channel3));
+        g_modh_timeout = 1;
+        USART_ReceiveData(UART4);
+        printf("idle");
+        RGB_Light(YELLOW);
+
+        {
+            uint8_t i;
+            for(i = 0; i < 1000 - DMA_GetCurrDataCounter(DMA2_Channel3); i++)
+            {
+                printf("%d:%02X ", i, g_RxBuf4[i]);
+            }
+        }
+        g_tModH.RxCount = 1000 - DMA_GetCurrDataCounter(DMA2_Channel3);
+        uart4_dma_recvmsg();
+
     }
-	if(USART_GetITStatus(UART4,USART_IT_TC))
-	{
-		USART_ClearITPendingBit(UART4,USART_IT_TC);
-		USART_ITConfig(UART4,USART_IT_TC,DISABLE);
-		printf("send ok");
-		RS485_Host_SendOver();
-	}
-	
+    if(USART_GetITStatus(UART4, USART_IT_TC))
+    {
+        USART_ClearITPendingBit(UART4, USART_IT_TC);
+        USART_ITConfig(UART4, USART_IT_TC, DISABLE);
+        printf("send ok");
+        RS485_Host_SendOver();
+    }
+
 }
 #endif
 #if UART5_FIFO_EN==1
 void UART5_IRQHandler(void)
 {
-	uint8_t ch;
-	if(USART_GetITStatus(UART5,USART_IT_RXNE)!=RESET)
-	{
-		ch=USART_ReceiveData(UART5);
-		g_tUart5.pRxBuf[g_tUart5.usRxWrite] = ch;
+    uint8_t ch;
+    if(USART_GetITStatus(UART5, USART_IT_RXNE) != RESET)
+    {
+        ch = USART_ReceiveData(g_tUart5.uart);
+        g_tUart5.pRxBuf[g_tUart5.usRxWrite] = ch;
         if (++g_tUart5.usRxWrite >= g_tUart5.usRxBufSize)
         {
             g_tUart5.usRxWrite = 0;
@@ -511,18 +517,18 @@ void UART5_IRQHandler(void)
         {
             g_tUart5.usRxCount++;
         }
-		{
+        {
             if (g_tUart5.ReciveNew)
             {
                 g_tUart5.ReciveNew(ch);
             }
         }
-		
-	}
-	/* 处理发送缓冲区空中断 */
+
+    }
+    /* 处理发送缓冲区空中断 */
     if (USART_GetITStatus(g_tUart5.uart, USART_IT_TXE) != RESET)
     {
-
+//		printf("uart5 tx irq");
         //if (_pUart->usTxRead == _pUart->usTxWrite)
         if (g_tUart5.usTxCount == 0)
         {
@@ -534,6 +540,7 @@ void UART5_IRQHandler(void)
         }
         else
         {
+			printf("uart5 send\n");
             /* 从发送FIFO取1个字节写入串口发送数据寄存器 */
             USART_SendData(g_tUart5.uart, g_tUart5.pTxBuf[g_tUart5.usTxRead]);
             if (++g_tUart5.usTxRead >= g_tUart5.usTxBufSize)

@@ -23,6 +23,7 @@ VAR_SLAVE g_tVarS;   //网关modbus寄存器配置参数
 static void MODS_RxTimeOut(void)
 {
     g_mods_timeout = 1;
+	printf("\ntimeout");
 }
 /*
 *********************************************************************************************************
@@ -35,7 +36,7 @@ static void MODS_RxTimeOut(void)
 void MODS_ReciveNew(uint8_t _byte)
 {
     uint32_t timeout;
-
+	printf("%02X ",_byte);
     g_mods_timeout = 0;
     timeout = 36000000 / SBAUD485;			/* 计算超时时间，单位us 35000000*/
     bsp_StartHardTimer(1, timeout, (void *)MODS_RxTimeOut);
@@ -47,6 +48,11 @@ void MODS_ReciveNew(uint8_t _byte)
 
 void MODS_SendPacket(uint8_t *_buf, uint16_t _len)
 {
+	uint8_t i;
+//	for(i=0;i<_len;i++)
+//	{
+//		printf("%02X ",_buf[i]);
+//	}
     RS485_Slave_SendBuf(_buf, _len);
 }
 
@@ -283,7 +289,57 @@ static void MODS_02H(void)
 */
 static void MODS_03H(void)
 {
+	uint16_t reg;
+    uint16_t num;
+    uint16_t i;
+    uint8_t reg_value[64];
+	printf("\r\nMODS 03");
+    g_tModS.RspCode = RSP_OK;
 
+    if (g_tModS.RxCount != 8)								/* 03H命令必须是8个字节 */
+    {
+        g_tModS.RspCode = RSP_ERR_VALUE;					/* 数据值域错误 */
+        goto err_ret;
+    }
+
+    reg = BEBufToUint16(&g_tModS.RxBuf[2]); 				/* 寄存器号 */
+    num = BEBufToUint16(&g_tModS.RxBuf[4]);					/* 寄存器个数 */
+    if (num > sizeof(reg_value) / 2)
+    {
+        g_tModS.RspCode = RSP_ERR_VALUE;					/* 数据值域错误 */
+        goto err_ret;
+    }
+
+    for (i = 0; i < num; i++)
+    {
+        if (MODS_ReadRegValue(reg, &reg_value[2 * i]) == 0)	/* 读出寄存器值放入reg_value */
+        {
+            g_tModS.RspCode = RSP_ERR_REG_ADDR;				/* 寄存器地址错误 */
+            break;
+        }
+        reg++;
+    }
+
+err_ret:
+    if (g_tModS.RspCode == RSP_OK)							/* 正确应答 */
+    {
+			printf("\r\nMODS 03 OK");
+        g_tModS.TxCount = 0;
+        g_tModS.TxBuf[g_tModS.TxCount++] = g_tModS.RxBuf[0];
+        g_tModS.TxBuf[g_tModS.TxCount++] = g_tModS.RxBuf[1];
+        g_tModS.TxBuf[g_tModS.TxCount++] = num * 2;			/* 返回字节数 */
+
+        for (i = 0; i < num; i++)
+        {
+            g_tModS.TxBuf[g_tModS.TxCount++] = reg_value[2 * i];
+            g_tModS.TxBuf[g_tModS.TxCount++] = reg_value[2 * i + 1];
+        }
+        MODS_SendWithCRC(g_tModS.TxBuf, g_tModS.TxCount);	/* 发送正确应答 */
+    }
+    else
+    {
+        MODS_SendAckErr(g_tModS.RspCode);					/* 发送错误应答 */
+    }
 }
 /*
 *********************************************************************************************************

@@ -16,6 +16,7 @@ void bsp_board_init(void)
 	bsp_systick_init();
 	bsp_timer_init();
 	RS485_Host_InitTXE();
+	RS485_Slave_InitTXE();
 	dma2_channel5_init(USART4_DR_Base,(uint32_t)g_TxBuf4,1000,DMA_DIR_PeripheralDST);
 	dma2_channel3_init(USART4_DR_Base,(uint32_t)g_tModH.RxBuf,1000,DMA_DIR_PeripheralSRC);
 }

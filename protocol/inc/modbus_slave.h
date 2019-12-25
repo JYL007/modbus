@@ -70,5 +70,5 @@ typedef struct
 
 void MODS_ReciveNew(uint8_t _byte);
 
-
+void MODS_Poll(void);
 #endif

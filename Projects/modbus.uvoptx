@@ -152,34 +152,34 @@
         <Bp>
           <Number>0</Number>
           <Type>0</Type>
-          <LineNumber>270</LineNumber>
+          <LineNumber>604</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134221430</Address>
+          <Address>134221936</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
           <SizeOfObject>0</SizeOfObject>
           <BreakByAccess>0</BreakByAccess>
           <BreakIfRCount>1</BreakIfRCount>
-          <Filename>..\bsp_driver\src\bsp_timer.c</Filename>
+          <Filename>..\protocol\src\modbus_slave.c</Filename>
           <ExecCommand></ExecCommand>
-          <Expression>\\modbus\../bsp_driver/src/bsp_timer.c\270</Expression>
+          <Expression>\\modbus\../protocol/src/modbus_slave.c\604</Expression>
         </Bp>
         <Bp>
           <Number>1</Number>
           <Type>0</Type>
-          <LineNumber>33</LineNumber>
+          <LineNumber>654</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134225020</Address>
+          <Address>0</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
           <SizeOfObject>0</SizeOfObject>
           <BreakByAccess>0</BreakByAccess>
-          <BreakIfRCount>1</BreakIfRCount>
-          <Filename>..\App\main.c</Filename>
+          <BreakIfRCount>0</BreakIfRCount>
+          <Filename>..\protocol\src\modbus_slave.c</Filename>
           <ExecCommand></ExecCommand>
-          <Expression>\\modbus\../App/main.c\33</Expression>
+          <Expression></Expression>
         </Bp>
       </Breakpoint>
       <Tracepoint>

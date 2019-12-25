@@ -1,12 +1,11 @@
 #include "bsp_rs485.h"
 #include "bsp_usartx.h"
 #include "bsp_led.h"
-
+#include<stdio.h>
 #include<string.h>
 
 void RS485_Slave_SendBefor(void)
 {
-//    printf("\r\nslave sendbefor");
     RS485_SLAVE_TX_EN();
 }
 void RS485_Slave_SendOver(void)
@@ -46,14 +45,13 @@ void RS485_Host_InitTXE(void)
     GPIO_InitStructure.GPIO_Pin = PIN_RS485_HOST_TXEN;
     GPIO_Init(PORT_RS485_HOST_TXEN, &GPIO_InitStructure);
 	RS485_Host_SendOver();
-//	RS485_Host_SendBefor();
-	
-	
+		
 }
 
 void RS485_Slave_SendBuf(uint8_t *_ucaBuf, uint16_t _usLen)
 {
 //    printf("\r\nslave ack");
+	uart5_send_buf(_ucaBuf,_usLen);
 	
 }
 void RS485_Host_SendBuf(uint8_t *_ucaBuf, uint16_t _usLen)

@@ -75,7 +75,7 @@ typedef struct
 void bsp_usart_init(void);
 
 void uart4_dma_sendmsg(char *msg,uint16_t len);
-
+void uart5_send_buf(char *msg,uint16_t len);
 #endif
 
 

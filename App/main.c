@@ -36,7 +36,7 @@ int main()
 	
 	while(1)
 	{
-		
+		MODS_Poll();
 	}
 	
 }
